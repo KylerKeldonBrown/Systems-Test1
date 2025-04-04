@@ -1,6 +1,12 @@
+// Filename: main.go
+// Purpose: This program demonstrates how to create a TCP network connection using Go
+// Kyler Brown Test1
+
 package main
 
 import (
+	"encoding/json"
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -13,6 +19,7 @@ import (
 type ScanResult struct {
 	Target string `json:"target"`
 	Port   int    `json:"port"`
+	Banner string `json:"banner,omitempty"`
 	Open   bool   `json:"open"`
 }
 
@@ -46,6 +53,15 @@ func worker(wg *sync.WaitGroup, tasks chan ScanTask, results chan ScanResult, ti
 
 		if err == nil {
 			defer conn.Close()
+			conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+			buff := make([]byte, 1024)
+			n, _ := conn.Read(buff)
+
+			if n > 0 {
+				result.Banner = string(buff[:n])
+			} else {
+				result.Banner = "No response"
+			}
 		}
 
 		results <- result
@@ -68,19 +84,17 @@ func parsePorts(ports string) []int {
 }
 
 func main() {
-	// Command-line flags
 	targetsFlag := flag.String("targets", "scanme.nmap.org", "Comma-separated list of target IPs/hostnames")
 	startPort := flag.Int("start-port", 1, "Start of port range")
 	endPort := flag.Int("end-port", 1024, "End of port range")
 	workers := flag.Int("workers", 100, "Number of concurrent workers")
 	timeout := flag.Int("timeout", 3, "Timeout in seconds for each connection")
+	jsonOut := flag.Bool("json", false, "Output results in JSON format")
 	portList := flag.String("ports", "", "Comma-separated list of specific ports to scan")
 	flag.Parse()
 
-	// Parse targets
 	targets := strings.Split(*targetsFlag, ",")
 
-	// Parse ports
 	var ports []int
 	if *portList != "" {
 		ports = parsePorts(*portList)
@@ -96,13 +110,11 @@ func main() {
 
 	start := time.Now()
 
-	// Start workers
 	for i := 0; i < *workers; i++ {
 		wg.Add(1)
 		go worker(&wg, tasks, results, time.Duration(*timeout)*time.Second)
 	}
 
-	// Assign tasks to workers
 	go func() {
 		for _, target := range targets {
 			trimmedTarget := strings.TrimSpace(target)
@@ -118,7 +130,6 @@ func main() {
 		close(tasks)
 	}()
 
-	// Close results channel once workers are done
 	go func() {
 		wg.Wait()
 		close(results)
@@ -138,10 +149,14 @@ func main() {
 
 	elapsed := time.Since(start)
 
-	// Output scan summary
+	// Output
 	fmt.Println("=== Scan Summary ===")
 	fmt.Printf("Targets Scanned: %d\n", len(targets))
 	fmt.Printf("Ports Scanned: %d\n", len(ports)*len(targets))
 	fmt.Printf("Open Ports: %d\n", len(openPorts))
 	fmt.Printf("Scan Duration: %v\n", elapsed)
+
+	if *jsonOut {
+		json.NewEncoder(os.Stdout).Encode(openPorts)
+	}
 }
