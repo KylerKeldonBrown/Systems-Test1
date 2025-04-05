@@ -4,3 +4,5 @@ Make sure you're in the same directory as main.go, then run: go run -o portscann
 
 Sample output Scanning port 80 on scanme.nmap.org... [OPEN] scanme.nmap.org:80 Scanning port 443 on scanme.nmap.org... [CLOSED] scanme.nmap.org:443 === Scan Summary === Targets Scanned: 1 Ports Scanned: 2 Open Ports: 1 Scan Duration: 1.00234567s
 
+Homework Video Link:
+https://youtu.be/5TsCWXudeTE
